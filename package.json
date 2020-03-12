@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "start": "serverless offline --skipCacheInvalidation"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -20,5 +20,7 @@
     "request": "^2.88.2",
     "serverless-http": "^2.3.2"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "serverless-offline": "^5.12.1"
+  }
 }

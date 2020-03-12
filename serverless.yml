@@ -4,12 +4,12 @@ provider:
   runtime: nodejs12.x
   region: ${self:custom.secrets.REGION}
   stage: dev
-  environment: 
+  environment:
+    REGION: ${self:custom.secrets.REGION}
     DB: ${self:custom.secrets.DB}
     APIKEY: ${self:custom.secrets.APIKEY}
     JWT_SECRET: ${self:custom.secrets.JWT_SECRET}
     STAGE: ${self:custom.secrets.STAGE}
-
 
 
 functions:
@@ -20,9 +20,9 @@ functions:
       - http: 'ANY {proxy+}'
 
 
-
 custom:
   secrets: ${file(secrets.json)}
 
-# plugins:
-#   - serverless-offline
+  
+plugins:
+  - serverless-offline

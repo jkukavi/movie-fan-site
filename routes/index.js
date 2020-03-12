@@ -1,120 +1,109 @@
 var express = require('express');
 var router = express.Router();
-const request = require('request')
 var Movie = require('../db/models/movie.js')
-var User = require('../db/models/user.js')
-const jwt = require('jsonwebtoken')
 const auth = require('../middleware/auth.js')
-var cookieParser = require('cookie-parser');
+const asyncGetMovieData= require('../utils/asyncGetMovieData')
 
-
-const apiKey = process.env.APIKEY
 const apiBaseUrl = 'http://api.themoviedb.org/3'
-
+const apiKey = process.env.APIKEY
 const imageBaseUrl = 'http://image.tmdb.org/t/p/w300';
 
-
-
+//make imageBaseUrl accessible within the viewengine
 router.use((req, res, next) => {
   res.locals.imageBaseUrl = imageBaseUrl
   next()
 })
 
-router.use(cookieParser())
+//ROUTES::::::::::::::
 
 
 //now-playing view (index)
-router.get('/', auth, function(req, res, next) {
-  const nowPlayingUrl = `${apiBaseUrl}/movie/now_playing?api_key=${apiKey}`
-  
-  request.get(nowPlayingUrl, (error, response, movieData) => {
-    
-    const parsedData = JSON.parse(movieData)
+router.get('/', auth, async function(req, res, next) {
 
-    res.render('index', {
-      parsedData: parsedData.results
-              })
+  const url = `${apiBaseUrl}/movie/now_playing?api_key=${apiKey}`
+  const parsedData = await asyncGetMovieData(url)
+  //movies are in the .results of the received JSON
+  res.render('index', {parsedData: parsedData.results})
 
-            })
 })
 
 
-router.post('/movie', auth, async (req, res, next) => {
+//Add a movie to favorite
+router.post('/favorite', auth, async (req, res, next) => {
   
-    const movieAlreadySaved = await Movie.findOne({...req.body,
-                                      owner: req.user._id})
+  const movieAlreadySaved = await Movie.findOne({
+    ...req.body,
+    owner: req.user._id
+  })
 
-
-    if(!movieAlreadySaved) {
+  if(!movieAlreadySaved) {
     const movie = new Movie({...req.body,
-                              owner: req.user._id})
+    owner: req.user._id})
+    //is it necessary to await?
     await movie.save()
-    }
+  }
  
 })
 
-router.delete('/movie', auth, async (req, res, next) => {
-  
-  await Movie.deleteOne({...req.body,
-                          owner: req.user._id})
-  
+
+//Delete a movie from favorite
+router.delete('/favorite', auth, async (req, res, next) => {
+
+  await Movie.deleteOne({
+    ...req.body,
+    owner: req.user._id})
+
 })
 
+
+//Get movies from favorite
 router.get('/favorite', auth, async (req, res, next) => {
 
-  const parsedData = await Movie.find({owner: req.user._id}, (err)=> 0)
+  const parsedData = await Movie.find({owner: req.user._id})
   res.render('index', {parsedData})
 
 })
-//single-page view
 
 
-router.get('/movie/:id', auth, (req, res, next) => {
+//Open a single page for a movie user has clicked
+router.get('/movie/:id', auth, async (req, res, next) => {
 
   const movieId = req.params.id;
-  const thisMovieUrl = `${apiBaseUrl}/movie/${movieId}?api_key=${apiKey}`
-  
-  request.get(thisMovieUrl, (error, response, movieDetails) => {
+  const url = `${apiBaseUrl}/movie/${movieId}?api_key=${apiKey}`
+  const parsedData = await asyncGetMovieData(url)
+  res.render('single-movie', {parsedData})
 
-    const parsedData = JSON.parse(movieDetails)
-    res.render('single-movie', {parsedData})
-
-
-
-  })
 })
 
-//search route
-router.post('/search', auth, (req, res, next) => {
+
+//Search for a movie or an actor (category: movie or actor)
+router.post('/search', auth, async (req, res, next) => {
+
+  //get query data
   const userSearchTerm = encodeURI(req.body.movieSearch)
   const category = req.body.category
-  const movieUrl = `${apiBaseUrl}/search/${category}?query=${userSearchTerm}&api_key=${apiKey}`
-  console.log(movieUrl)
 
-  request.get(movieUrl, (error, response, movieData) => {
-    
-    try{
-    const parsedData = JSON.parse(movieData)
-    
-    if(!parsedData.results.length) {
-      throw new Error()
-    }
-    
-    if(category==="person"){
-      parsedData.results = parsedData.results[0].known_for 
+  //get movie data user searched for
+  const url = `${apiBaseUrl}/search/${category}?query=${userSearchTerm}&api_key=${apiKey}`
+  const parsedData = await asyncGetMovieData(url)
 
-    }
+  //in case no results arrived
+  if(!parsedData.results.length) {
+    res.render('index', {parsedData:[]})
+    return
+  }
+  
+  //in case the category was person, movies are in .results[0].known_for
+  if(category==="person"){
+    parsedData.results = parsedData.results[0].known_for 
+  }
 
-    //to exclude data without a poster:
-    parsedData.results = parsedData.results.filter((data)=>data.poster_path)
+  //to exclude movies without a poster: (to avoid "no image" on page)
+  parsedData.results = parsedData.results.filter((data)=>data.poster_path)
 
-    res.render('index', {
-      parsedData: parsedData.results
-    })} catch(e){
-      res.render('index', {parsedData:[]})
-    }
-  })
+  res.render('index', {parsedData: parsedData.results})
 
 })
+ 
 
 module.exports = router

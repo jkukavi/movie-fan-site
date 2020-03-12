@@ -42,7 +42,7 @@
 		//get the input value
         $.ajax({
             //the url to send the data to
-            url: "<%=process.env.STAGE%>/movie",
+            url: "<%=process.env.STAGE%>/favorite",
             //the data to send to
 			data: {"id": "<%= parsedData.id %>",
 				   "poster_path": "<%=parsedData.poster_path%>",
